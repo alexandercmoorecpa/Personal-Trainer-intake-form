@@ -9,7 +9,6 @@ st.title("Tax Client Intake Form – 2025/2026")
 
 # --- DATA SAFETY HELPER ---
 def clean_text(text):
-    """Ensures text is safe for the PDF engine."""
     if text is None or text == "" or text == "None":
         return "-"
     return str(text).replace("•", "-").replace("—", "-").replace("–", "-").replace("’", "'").replace("“", '"').replace("”", '"')
@@ -48,14 +47,17 @@ for i in range(num_deps):
         with c1: d_name = st.text_input("Full Name", key=f"dname_{i}")
         with c2: d_rel = st.selectbox("Relationship", ["Child", "Parent", "Step-child", "Other"], key=f"drel_{i}")
         with c3: d_dob = st.date_input("Date of Birth", value=None, key=f"ddob_{i}")
-        
-        dep_list.append({
-            "name": d_name, 
-            "rel": d_rel, 
-            "dob": str(d_dob) if d_dob else "N/A"
-        })
+        dep_list.append({"name": d_name, "rel": d_rel, "dob": str(d_dob) if d_dob else "N/A"})
 
-# --- 3. INCOME & 4. DEDUCTIONS ---
+# --- 3. MEDICAL (MOVED OUTSIDE FORM TO ALLOW INTERACTION) ---
+st.header("4. Medical & Dental Expenses")
+st.info("💡 Note: You can usually only deduct medical expenses that exceed 7.5% of your Adjusted Gross Income (AGI).")
+medical_check = st.checkbox("I had significant out-of-pocket medical/dental expenses this year.")
+medical_notes_val = ""
+if medical_check:
+    medical_notes_val = st.text_input("Brief description of major medical costs (e.g., Surgery, Orthodontics, etc.)")
+
+# --- 4. THE REST OF THE FORM ---
 with st.form("financial_info_form"):
     st.header("3. Income")
     incomes = st.multiselect("Select all applicable income sources:", 
@@ -71,19 +73,13 @@ with st.form("financial_info_form"):
          "Yes - I sold them for MORE than I paid (Taxable gain)", "Unsure"]
     )
 
-    st.header("4. Deductions & Credits")
+    st.header("5. Other Deductions & Credits")
     deductions = st.multiselect("Select all applicable deductions/credits:", 
                                 ["IRA Contribution", "Student Loan Interest", "Mortgage Interest", 
                                  "Charitable Giving", "Child Tax Credit", "Energy Credits", 
                                  "HSA Contribution", "Gambling Losses (only deductible up to amount of winnings)"])
 
-    st.subheader("Medical & Dental Expenses")
-    st.info("💡 Note: You can usually only deduct medical expenses that exceed 7.5% of your Adjusted Gross Income (AGI).")
-    medical_check = st.checkbox("I had significant out-of-pocket medical/dental expenses this year.")
-    medical_notes = st.text_input("Brief description of major medical costs (e.g., Surgery, Orthodontics, etc.)", 
-                                  disabled=not medical_check)
-
-    st.header("5. Additional Notes")
+    st.header("6. Additional Notes")
     notes = st.text_area("Any other life changes, questions, or notes for your preparer?")
     
     submitted = st.form_submit_button("Generate Summary PDF", type="primary")
@@ -94,7 +90,6 @@ class TaxPDF(FPDF):
         self.set_font("Helvetica", "B", 16)
         self.set_text_color(40, 40, 40)
         self.cell(0, 10, "CLIENT INTAKE SUMMARY", ln=True, align="L")
-        
         self.set_font("Helvetica", "B", 10)
         self.set_text_color(120, 120, 120)
         self.cell(0, 5, f"Tax Year: 2025/2026 | Generated: {datetime.date.today()}", ln=True, align="L")
@@ -111,7 +106,6 @@ class TaxPDF(FPDF):
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(100, 100, 100)
         self.cell(0, 5, clean_text(label).upper(), ln=True)
-        
         self.set_font("Helvetica", "", 10)
         self.set_text_color(0, 0, 0)
         self.multi_cell(0, 6, clean_text(value))
@@ -125,7 +119,6 @@ if submitted:
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
         
-        # Section 1
         pdf.add_section_header("1. PERSONAL INFORMATION")
         pdf.add_field("Taxpayer Name", tp_name)
         pdf.add_field("Taxpayer DOB", str(tp_dob))
@@ -135,7 +128,6 @@ if submitted:
         pdf.add_field("Contact", f"Ph: {phone} / Email: {email}")
         pdf.add_field("Filing Status", status)
 
-        # Section 2
         pdf.ln(2)
         pdf.add_section_header("2. DEPENDENTS")
         if num_deps > 0:
@@ -146,22 +138,24 @@ if submitted:
         else:
             pdf.cell(0, 8, "No dependents listed.", ln=True)
 
-        # Section 3
         pdf.ln(5)
         pdf.add_section_header("3. INCOME")
         pdf.add_field("General Income Sources", ", ".join(incomes) if incomes else "None selected")
         pdf.add_field("Personal Property Sales", personal_sales)
 
-        # Section 4
         pdf.ln(5)
-        pdf.add_section_header("4. DEDUCTIONS & CREDITS")
-        pdf.add_field("Deductions Selected", ", ".join(deductions) if deductions else "None selected")
+        pdf.add_section_header("4. MEDICAL EXPENSES")
         if medical_check:
-            pdf.add_field("Significant Medical Expenses", medical_notes if medical_notes else "Yes (details to follow)")
-        
-        # Section 5
+            pdf.add_field("Medical Expenses Claimed", medical_notes_val if medical_notes_val else "Yes (no details provided)")
+        else:
+            pdf.cell(0, 8, "No significant medical expenses reported.", ln=True)
+
         pdf.ln(5)
-        pdf.add_section_header("5. ADDITIONAL NOTES")
+        pdf.add_section_header("5. OTHER DEDUCTIONS & CREDITS")
+        pdf.add_field("Deductions Selected", ", ".join(deductions) if deductions else "None selected")
+        
+        pdf.ln(5)
+        pdf.add_section_header("6. ADDITIONAL NOTES")
         pdf.multi_cell(0, 7, clean_text(notes) if notes else "No additional notes.")
 
         try:
