@@ -59,19 +59,29 @@ for i in range(num_deps):
 with st.form("financial_info_form"):
     st.header("3. Income")
     incomes = st.multiselect("Select all applicable income sources:", 
-                             ["W-2 Wages", "Interest/Dividends", "K-1 Income (Partnerships/S-Corps)", "Capital Gains", "Retirement/IRA", 
-                              "Social Security", "Self-Employment", "Rental Income", "Unemployment"])
+                             ["W-2 Wages", "Interest/Dividends", "K-1 Income (Partnerships/S-Corps)", 
+                              "Capital Gains (Stocks/Crypto)", "Gambling Winnings (W-2G or Casual)", 
+                              "Retirement/IRA Distributions", "Social Security", "Self-Employment", 
+                              "Rental Income", "Unemployment"])
 
     st.subheader("Personal Item Sales (eBay, Garage Sales, etc.)")
     personal_sales = st.radio(
         "Did you sell personal items (clothes, furniture, electronics) this year?",
-        ["No", "Yes - I sold them for LESS than I originally paid (Non-taxable)", "Yes - I sold them for MORE than I paid (Taxable Gain)", "Unsure"]
+        ["No", "Yes - I sold them for LESS than I originally paid (Non-taxable loss)", 
+         "Yes - I sold them for MORE than I paid (Taxable gain)", "Unsure"]
     )
 
     st.header("4. Deductions & Credits")
     deductions = st.multiselect("Select all applicable deductions/credits:", 
                                 ["IRA Contribution", "Student Loan Interest", "Mortgage Interest", 
-                                 "Charitable Giving", "Child Tax Credit", "Energy Credits", "HSA Contribution"])
+                                 "Charitable Giving", "Child Tax Credit", "Energy Credits", 
+                                 "HSA Contribution", "Gambling Losses (only deductible up to amount of winnings)"])
+
+    st.subheader("Medical & Dental Expenses")
+    st.info("💡 Note: You can usually only deduct medical expenses that exceed 7.5% of your Adjusted Gross Income (AGI).")
+    medical_check = st.checkbox("I had significant out-of-pocket medical/dental expenses this year.")
+    medical_notes = st.text_input("Brief description of major medical costs (e.g., Surgery, Orthodontics, etc.)", 
+                                  disabled=not medical_check)
 
     st.header("5. Additional Notes")
     notes = st.text_area("Any other life changes, questions, or notes for your preparer?")
@@ -139,13 +149,15 @@ if submitted:
         # Section 3
         pdf.ln(5)
         pdf.add_section_header("3. INCOME")
-        pdf.add_field("General Income", ", ".join(incomes) if incomes else "None selected")
+        pdf.add_field("General Income Sources", ", ".join(incomes) if incomes else "None selected")
         pdf.add_field("Personal Property Sales", personal_sales)
 
         # Section 4
         pdf.ln(5)
         pdf.add_section_header("4. DEDUCTIONS & CREDITS")
-        pdf.multi_cell(0, 6, clean_text(", ".join(deductions) if deductions else "None selected"))
+        pdf.add_field("Deductions Selected", ", ".join(deductions) if deductions else "None selected")
+        if medical_check:
+            pdf.add_field("Significant Medical Expenses", medical_notes if medical_notes else "Yes (details to follow)")
         
         # Section 5
         pdf.ln(5)
